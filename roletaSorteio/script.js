@@ -57,6 +57,36 @@ let isSpinning = false;
 let currentRotation = 0;
 let prizeHistory = [];
 
+// Variáveis para controle do novo modo Prêmio -> Funcionário
+let drawMode = 'funcionario-premio'; // 'funcionario-premio' (padrão) ou 'premio-funcionario'
+let currentPrizeIndex = 0; // Índice do prêmio atual sendo sorteado
+let availablePrizes = []; // Cópia dos prêmios disponíveis para sorteio
+let imageCache = new Map(); // Cache de imagens para melhor performance
+
+// Função para carregar e cachear imagem
+function loadAndCacheImage(photoPath) {
+    if (!photoPath) return null;
+    
+    if (imageCache.has(photoPath)) {
+        return imageCache.get(photoPath);
+    }
+    
+    const img = new Image();
+    img.src = photoPath;
+    imageCache.set(photoPath, img);
+    
+    return img;
+}
+
+// Função para pré-carregar todas as imagens dos funcionários
+function preloadEmployeeImages() {
+    employees.forEach(employee => {
+        if (employee.photo) {
+            loadAndCacheImage(employee.photo);
+        }
+    });
+}
+
 // 🔐 CONFIGURAÇÃO SEGURA DO WEBHOOK
 let discordWebhookURL = localStorage.getItem('discordWebhook') || '';
 
@@ -737,9 +767,42 @@ function drawFullscreenWheel() {
         fullscreenCtx.shadowColor = 'rgba(0,0,0,0.8)';
         fullscreenCtx.shadowBlur = 3;
         
-        let prize = participant.prize;
-        if (prize.length > 18) prize = prize.substring(0, 18) + '...';
-        fullscreenCtx.fillText(prize, 0, 5);
+        if (drawMode === 'premio-funcionario') {
+            // No modo Prêmio → Funcionário, mostrar foto do funcionário
+            const photoPath = participant.employee?.photo || participant.photo;
+            const img = loadAndCacheImage(photoPath);
+            
+            if (img && img.complete) {
+                // Desenhar foto se já carregou
+                fullscreenCtx.save();
+                
+                // Criar círculo para a foto
+                const photoRadius = 35;
+                fullscreenCtx.beginPath();
+                fullscreenCtx.arc(0, 0, photoRadius, 0, 2 * Math.PI);
+                fullscreenCtx.clip();
+                
+                // Desenhar a foto
+                fullscreenCtx.drawImage(img, -photoRadius, -photoRadius, photoRadius * 2, photoRadius * 2);
+                
+                fullscreenCtx.restore();
+            } else {
+                // Fallback para nome se a imagem não carregou ainda
+                let displayName = participant.employee?.name || participant.name;
+                if (displayName.length > 18) displayName = displayName.substring(0, 18) + '...';
+                fullscreenCtx.fillText(displayName, 0, 5);
+                
+                // Recarregar a roleta quando a imagem carregar
+                if (img) {
+                    img.onload = () => drawFullscreenWheel();
+                }
+            }
+        } else {
+            // No modo padrão, mostrar o prêmio
+            let displayText = participant.prize;
+            if (displayText.length > 18) displayText = displayText.substring(0, 18) + '...';
+            fullscreenCtx.fillText(displayText, 0, 5);
+        }
         
         fullscreenCtx.restore();
     });
@@ -834,6 +897,20 @@ function showDebugPanel() {
                 </div>
                 
                 <div class="debug-section">
+                    <h4>🎯 Modo de Sorteio</h4>
+                    <label>Tipo de Sorteio:</label>
+                    <select id="debugDrawMode" onchange="changeDrawMode(this.value)">
+                        <option value="funcionario-premio" ${drawMode === 'funcionario-premio' ? 'selected' : ''}>👤 Funcionário → Prêmio (Padrão)</option>
+                        <option value="premio-funcionario" ${drawMode === 'premio-funcionario' ? 'selected' : ''}>🏆 Prêmio → Funcionário</option>
+                    </select>
+                    <div id="currentPrizeInfo" style="margin-top: 10px; ${drawMode === 'premio-funcionario' && availablePrizes.length > 0 ? '' : 'display: none;'}">
+                        <p><strong>Prêmio atual:</strong> <span id="currentPrizeName">${availablePrizes[currentPrizeIndex] || 'Nenhum'}</span></p>
+                        <p><strong>Prêmios restantes:</strong> ${availablePrizes.length}</p>
+                        <button onclick="nextPrize()" class="debug-btn" ${availablePrizes.length <= 1 ? 'disabled' : ''}>⏭️ Próximo Prêmio</button>
+                    </div>
+                </div>
+                
+                <div class="debug-section">
                     <h4>📊 Informações do Sistema</h4>
                     <div class="debug-info">
                         <p><strong>Colaboradores selecionados:</strong> ${selectedEmployees.length}</p>
@@ -863,6 +940,233 @@ function hideDebugPanel() {
     const panel = document.getElementById('debugPanel');
     if (panel) panel.remove();
     debugMode = false;
+}
+
+function changeDrawMode(mode) {
+    drawMode = mode;
+    localStorage.setItem('drawMode', drawMode);
+    
+    if (mode === 'premio-funcionario') {
+        initializePrizeMode();
+    } else {
+        // Voltar ao modo padrão
+        availablePrizes = [];
+        currentPrizeIndex = 0;
+        updateParticipants(); // Regenerar participantes no modo padrão
+    }
+    
+    // Atualizar interface do prêmio atual
+    updateCurrentPrizeDisplay();
+    
+    // Atualizar botão de girar
+    updateSpinButton();
+    
+    // Atualizar painel de debug se estiver aberto
+    if (debugMode) {
+        showDebugPanel();
+    }
+    
+    console.log(`🎯 Modo alterado para: ${mode}`);
+}
+
+function initializePrizeMode() {
+    // Criar cópia dos prêmios disponíveis
+    availablePrizes = [...prizes];
+    currentPrizeIndex = 0;
+    
+    // Selecionar automaticamente todos os funcionários disponíveis que ainda não ganharam
+    autoSelectAvailableEmployees();
+    
+    // Gerar participantes apenas com funcionários que não ganharam ainda
+    generateParticipantsForPrizeMode();
+    
+    console.log(`🏆 Modo Prêmio → Funcionário inicializado. ${availablePrizes.length} prêmios disponíveis.`);
+}
+
+function autoSelectAvailableEmployees() {
+    // Obter nomes dos funcionários que já ganharam prêmios
+    const winnersNames = prizeHistory.map(entry => entry.employee || entry.name);
+    
+    // Limpar seleção atual
+    selectedEmployees = [];
+    
+    // Selecionar automaticamente todos os funcionários que ainda não ganharam
+    employees.forEach((employee, index) => {
+        if (!winnersNames.includes(employee.name)) {
+            selectedEmployees.push(index);
+        }
+    });
+    
+    // Atualizar a interface visual
+    updateEmployeeCardsSelection();
+    
+    console.log(`🔄 Selecionados automaticamente ${selectedEmployees.length} funcionários elegíveis`);
+}
+
+function updateEmployeeCardsSelection() {
+    const cards = document.querySelectorAll('.employee-card');
+    cards.forEach((card, index) => {
+        if (selectedEmployees.includes(index)) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    });
+}
+
+function nextPrize() {
+    if (drawMode !== 'premio-funcionario' || availablePrizes.length <= 1) return;
+    
+    currentPrizeIndex = (currentPrizeIndex + 1) % availablePrizes.length;
+    
+    // Re-selecionar funcionários elegíveis para o novo prêmio
+    autoSelectAvailableEmployees();
+    
+    // Atualizar painel de debug se estiver aberto
+    if (debugMode) {
+        const currentPrizeName = document.getElementById('currentPrizeName');
+        if (currentPrizeName) {
+            currentPrizeName.textContent = availablePrizes[currentPrizeIndex] || 'Nenhum';
+        }
+    }
+    
+    // Regenerar participantes para o novo prêmio
+    generateParticipantsForPrizeMode();
+    
+    console.log(`⏭️ Próximo prêmio selecionado: ${availablePrizes[currentPrizeIndex]}`);
+}
+
+function generateParticipantsForPrizeMode() {
+    if (drawMode !== 'premio-funcionario') return;
+    
+    // Verificar se há prêmio atual disponível
+    if (!availablePrizes || availablePrizes.length === 0 || currentPrizeIndex >= availablePrizes.length) {
+        participants = [];
+        drawWheel();
+        if (fullscreenCanvas) drawFullscreenWheel();
+        return;
+    }
+    
+    // Obter funcionários que ainda não ganharam nenhum prêmio
+    // Usar 'name' como fallback para compatibilidade
+    const winnersNames = prizeHistory.map(entry => entry.employee || entry.name);
+    const availableEmployees = selectedEmployees.map(index => employees[index])
+        .filter(emp => !winnersNames.includes(emp.name));
+    
+    // Criar participantes com o prêmio atual
+    const currentPrize = availablePrizes[currentPrizeIndex];
+    participants = availableEmployees.map(employee => ({
+        employee: employee, // Manter estrutura original para compatibilidade
+        prize: currentPrize, // Usar o prêmio atual sendo sorteado
+        name: employee.name,
+        photo: employee.photo
+    }));
+    
+    // Atualizar a roleta
+    drawWheel();
+    if (fullscreenCanvas) drawFullscreenWheel();
+    
+    // Atualizar botão de girar
+    updateSpinButton();
+    
+    console.log(`👥 ${participants.length} funcionários elegíveis para o prêmio: ${currentPrize}`);
+    
+    // Atualizar interface
+    updateCurrentPrizeDisplay();
+}
+
+function updateCurrentPrizeDisplay() {
+    const indicator = document.getElementById('currentPrizeIndicator');
+    const prizeText = document.getElementById('currentPrizeText');
+    const fullscreenIndicator = document.getElementById('fullscreenCurrentPrize');
+    const fullscreenPrizeText = document.getElementById('fullscreenCurrentPrizeText');
+    
+    if (drawMode === 'premio-funcionario' && availablePrizes.length > 0) {
+        // Mostrar indicadores
+        if (indicator) {
+            indicator.style.display = 'block';
+            prizeText.textContent = availablePrizes[currentPrizeIndex] || 'Nenhum';
+        }
+        if (fullscreenIndicator) {
+            fullscreenIndicator.style.display = 'block';
+            fullscreenPrizeText.textContent = availablePrizes[currentPrizeIndex] || 'Nenhum';
+        }
+    } else {
+        // Ocultar indicadores
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+        if (fullscreenIndicator) {
+            fullscreenIndicator.style.display = 'none';
+        }
+    }
+    
+    // Atualizar interface baseada no modo
+    updateModeSpecificInterface();
+}
+
+function updateModeSpecificInterface() {
+    const nextEmployeeBtn = document.getElementById('nextEmployeeBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const employeeOrderSection = document.getElementById('employeeOrderSection');
+    const startDrawBtn = document.getElementById('startDrawBtn');
+    const prizeToEmployeeInfo = document.getElementById('prizeToEmployeeInfo');
+    
+    // Elementos da tela cheia
+    const fullscreenNextBtn = document.getElementById('fullscreenNextBtn');
+    const nextEmployeeDisplay = document.getElementById('nextEmployeeDisplay');
+    
+    if (drawMode === 'premio-funcionario') {
+        // Ocultar controles de funcionário no modo Prêmio → Funcionário
+        if (nextEmployeeBtn) nextEmployeeBtn.style.display = 'none';
+        if (fullscreenBtn) fullscreenBtn.style.display = 'none';
+        if (employeeOrderSection) employeeOrderSection.style.display = 'none';
+        
+        // Mostrar botão específico do modo Prêmio → Funcionário e mensagem informativa
+        if (startDrawBtn) startDrawBtn.style.display = 'inline-block';
+        if (prizeToEmployeeInfo) prizeToEmployeeInfo.style.display = 'block';
+        
+        // Ocultar controles da tela cheia
+        if (fullscreenNextBtn) fullscreenNextBtn.style.display = 'none';
+        if (nextEmployeeDisplay) nextEmployeeDisplay.style.display = 'none';
+        
+    } else {
+        // Mostrar controles no modo padrão
+        if (nextEmployeeBtn) nextEmployeeBtn.style.display = 'inline-block';
+        if (fullscreenBtn) fullscreenBtn.style.display = 'inline-block';
+        if (employeeOrderSection) employeeOrderSection.style.display = 'block';
+        
+        // Ocultar botão específico do modo Prêmio → Funcionário e mensagem informativa
+        if (startDrawBtn) startDrawBtn.style.display = 'none';
+        if (prizeToEmployeeInfo) prizeToEmployeeInfo.style.display = 'none';
+        
+        // Mostrar controles da tela cheia
+        if (fullscreenNextBtn) fullscreenNextBtn.style.display = 'inline-block';
+    }
+}
+
+function startPrizeToEmployeeDraw() {
+    if (drawMode !== 'premio-funcionario') return;
+    
+    // Verificar se há prêmios disponíveis
+    if (availablePrizes.length === 0) {
+        alert('❌ Não há prêmios disponíveis para sorteio!');
+        return;
+    }
+    
+    // Verificar se há funcionários elegíveis
+    if (selectedEmployees.length === 0 || participants.length === 0) {
+        alert('❌ Não há funcionários elegíveis para este prêmio! Todos os funcionários já podem ter ganhado prêmios.');
+        return;
+    }
+    
+    // Abrir tela cheia automaticamente e iniciar o sorteio
+    openFullscreen();
+    
+    // Pequeno delay para garantir que a tela cheia abriu
+    setTimeout(() => {
+        spinWheel();
+    }, 500);
 }
 
 function changeSpinSound(soundIndex) {
@@ -978,6 +1282,10 @@ function clearAllData() {
         prizeHistory = [];
         currentRotation = 0;
         
+        // Limpar dados do modo Prêmio → Funcionário
+        availablePrizes = [];
+        currentPrizeIndex = 0;
+        
         // Limpar interface
         document.querySelectorAll('.employee-card').forEach(card => {
             card.classList.remove('selected');
@@ -986,6 +1294,7 @@ function clearAllData() {
         updatePrizesList();
         updateParticipants();
         updatePrizeHistoryDisplay();
+        updateCurrentPrizeDisplay(); // Atualizar interface do prêmio atual
         updateDisplay();
         
         console.log('🧹 Todos os dados foram limpos');
@@ -1067,6 +1376,21 @@ function init() {
     updateDiscordButton(); // Verificar se webhook já está configurado
     loadSavedVolume(); // Carregar volume salvo
     
+    // Carregar modo de sorteio salvo
+    const savedDrawMode = localStorage.getItem('drawMode');
+    if (savedDrawMode) {
+        drawMode = savedDrawMode;
+        if (drawMode === 'premio-funcionario' && prizes.length > 0) {
+            initializePrizeMode();
+        }
+    }
+    
+    // Atualizar interface do prêmio atual
+    updateCurrentPrizeDisplay();
+    
+    // Pré-carregar imagens dos funcionários para melhor performance
+    preloadEmployeeImages();
+    
     // Carregar configuração de som salva
     const savedSpinSound = localStorage.getItem('selectedSpinSound');
     if (savedSpinSound !== null) {
@@ -1135,6 +1459,56 @@ function loadEmployees() {
 
 // ✅ Seleção de colaboradores (APENAS UM POR VEZ)
 function toggleEmployee(index) {
+    if (drawMode === 'premio-funcionario') {
+        // No modo Prêmio → Funcionário, permitir apenas desmarcar com confirmação
+        if (selectedEmployees.includes(index)) {
+            const employeeName = employees[index].name;
+            
+            // Verificar se o funcionário já ganhou algum prêmio
+            const hasWonPrize = prizeHistory.some(entry => (entry.employee || entry.name) === employeeName);
+            
+            if (hasWonPrize) {
+                alert(`❌ Não é possível desmarcar ${employeeName} pois ele(a) já ganhou um prêmio no sorteio atual.`);
+                return;
+            }
+            
+            // Confirmar desmarcação
+            if (confirm(`🤔 Tem certeza que deseja desmarcar ${employeeName}?\n\nEle(a) não participará do sorteio atual.`)) {
+                selectedEmployees = selectedEmployees.filter(empIndex => empIndex !== index);
+                const card = document.querySelectorAll('.employee-card')[index];
+                card.classList.remove('selected');
+                
+                // Regenerar participantes
+                generateParticipantsForPrizeMode();
+                
+                console.log(`❌ ${employeeName} foi desmarcado(a) do sorteio`);
+            }
+        } else {
+            // Não permitir selecionar manualmente - só pode remarcar quem foi desmarcado
+            const employeeName = employees[index].name;
+            const hasWonPrize = prizeHistory.some(entry => (entry.employee || entry.name) === employeeName);
+            
+            if (hasWonPrize) {
+                alert(`❌ ${employeeName} já ganhou um prêmio e não pode participar novamente neste sorteio.`);
+                return;
+            }
+            
+            // Permitir remarcar
+            if (confirm(`✅ Deseja remarcar ${employeeName} para participar do sorteio?`)) {
+                selectedEmployees.push(index);
+                const card = document.querySelectorAll('.employee-card')[index];
+                card.classList.add('selected');
+                
+                // Regenerar participantes
+                generateParticipantsForPrizeMode();
+                
+                console.log(`✅ ${employeeName} foi remarcado(a) para o sorteio`);
+            }
+        }
+        return;
+    }
+    
+    // Lógica original para modo padrão
     const card = document.querySelectorAll('.employee-card')[index];
     
     if (selectedEmployees.includes(index)) {
@@ -1292,6 +1666,11 @@ function addPrize() {
         updatePrizesList();
         updateParticipants();
         
+        // Se estamos no modo Prêmio → Funcionário, reinicializar
+        if (drawMode === 'premio-funcionario') {
+            initializePrizeMode();
+        }
+        
         input.style.transform = 'scale(1.05)';
         setTimeout(() => input.style.transform = 'scale(1)', 200);
     } else if (prizes.includes(prize)) {
@@ -1310,6 +1689,11 @@ function clearPrizes() {
         prizes = [];
         updatePrizesList();
         updateParticipants();
+        
+        // Limpar também os prêmios disponíveis no modo Prêmio → Funcionário
+        availablePrizes = [];
+        currentPrizeIndex = 0;
+        updateCurrentPrizeDisplay();
     }
 }
 
@@ -1408,19 +1792,25 @@ function updatePrizesList() {
 
 // 🎯 Criação de participantes
 function updateParticipants() {
-    participants = [];
-    
-    selectedEmployees.forEach(empIndex => {
-        prizes.forEach(prize => {
-            participants.push({
-                employee: employees[empIndex],
-                prize: prize
+    if (drawMode === 'premio-funcionario') {
+        // No modo Prêmio → Funcionário, usar função específica
+        generateParticipantsForPrizeMode();
+    } else {
+        // Modo padrão: criar participantes com cada combinação funcionário-prêmio
+        participants = [];
+        
+        selectedEmployees.forEach(empIndex => {
+            prizes.forEach(prize => {
+                participants.push({
+                    employee: employees[empIndex],
+                    prize: prize
+                });
             });
         });
-    });
+    }
     
-    // Atualizar próximo colaborador se há prêmios
-    if (selectedEmployees.length > 0 && prizes.length > 0) {
+    // Atualizar próximo colaborador se há prêmios (só no modo padrão)
+    if (drawMode === 'funcionario-premio' && selectedEmployees.length > 0 && prizes.length > 0) {
         const currentName = employees[selectedEmployees[0]].name;
         nextEmployeeName = getNextEmployeeName(currentName);
         updateNextEmployeeDisplay();
@@ -1514,9 +1904,42 @@ function drawWheel() {
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = 2;
         
-        let prize = participant.prize;
-        if (prize.length > 15) prize = prize.substring(0, 15) + '...';
-        ctx.fillText(prize, 0, 2);
+        if (drawMode === 'premio-funcionario') {
+            // No modo Prêmio → Funcionário, mostrar foto do funcionário
+            const photoPath = participant.employee?.photo || participant.photo;
+            const img = loadAndCacheImage(photoPath);
+            
+            if (img && img.complete) {
+                // Desenhar foto se já carregou
+                ctx.save();
+                
+                // Criar círculo para a foto
+                const photoRadius = 25;
+                ctx.beginPath();
+                ctx.arc(0, 0, photoRadius, 0, 2 * Math.PI);
+                ctx.clip();
+                
+                // Desenhar a foto
+                ctx.drawImage(img, -photoRadius, -photoRadius, photoRadius * 2, photoRadius * 2);
+                
+                ctx.restore();
+            } else {
+                // Fallback para nome se a imagem não carregou ainda
+                let displayName = participant.employee?.name || participant.name;
+                if (displayName.length > 15) displayName = displayName.substring(0, 15) + '...';
+                ctx.fillText(displayName, 0, 2);
+                
+                // Recarregar a roleta quando a imagem carregar
+                if (img) {
+                    img.onload = () => drawWheel();
+                }
+            }
+        } else {
+            // No modo padrão, mostrar o prêmio
+            let displayText = participant.prize;
+            if (displayText.length > 15) displayText = displayText.substring(0, 15) + '...';
+            ctx.fillText(displayText, 0, 2);
+        }
         
         ctx.restore();
     });
@@ -1558,7 +1981,15 @@ function updateSpinButton() {
     const btn = document.getElementById('spinBtn');
     const fullscreenBtn = document.getElementById('fullscreenSpinBtn');
     const hasEmployees = selectedEmployees.length > 0;
-    const hasPrizes = prizes.length >= 2; // 🎯 CORRIGIDO: Pelo menos 2 prêmios
+    
+    let hasPrizes;
+    if (drawMode === 'premio-funcionario') {
+        // No modo Prêmio → Funcionário, apenas precisa ter pelo menos 1 prêmio
+        hasPrizes = availablePrizes.length > 0;
+    } else {
+        // No modo padrão, precisa de pelo menos 2 prêmios
+        hasPrizes = prizes.length >= 2;
+    }
     
     const canSpin = hasEmployees && hasPrizes && !isSpinning;
     
@@ -1568,7 +1999,11 @@ function updateSpinButton() {
     if (!hasEmployees) {
         btn.textContent = '🎯 SELECIONE PELO MENOS 1 COLABORADOR';
     } else if (!hasPrizes) {
-        btn.textContent = '🎯 ADICIONE PELO MENOS 2 PRÊMIOS'; // 🎯 CORRIGIDO
+        if (drawMode === 'premio-funcionario') {
+            btn.textContent = '🎯 ADICIONE PELO MENOS 1 PRÊMIO';
+        } else {
+            btn.textContent = '🎯 ADICIONE PELO MENOS 2 PRÊMIOS';
+        }
     } else if (isSpinning) {
         btn.textContent = '🌀 GIRANDO...';
     } else {
@@ -1589,7 +2024,15 @@ function updateSpinButton() {
 // 🎪 Animação da roleta (10 SEGUNDOS)
 function spinWheel() {
     const hasEmployees = selectedEmployees.length > 0;
-    const hasPrizes = prizes.length >= 2;
+    
+    let hasPrizes;
+    if (drawMode === 'premio-funcionario') {
+        // No modo Prêmio → Funcionário, verificar se há prêmios disponíveis e participantes
+        hasPrizes = availablePrizes.length > 0 && participants.length > 0;
+    } else {
+        // No modo padrão, precisa de pelo menos 2 prêmios
+        hasPrizes = prizes.length >= 2;
+    }
     
     if (!hasEmployees || !hasPrizes || isSpinning) return;
     
@@ -1668,7 +2111,22 @@ function spinWheel() {
             const currentAngleAtPointer = pointerPosition - currentRotation;
             const normalizedAngle = ((currentAngleAtPointer % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
             const winnerIndex = Math.floor(normalizedAngle / segmentAngle);
-            const winner = participants[winnerIndex];
+            const selectedParticipant = participants[winnerIndex];
+            
+            let winner;
+            if (drawMode === 'premio-funcionario') {
+                // No modo Prêmio → Funcionário, o prêmio já está definido
+                winner = {
+                    employee: {
+                        name: selectedParticipant.name,
+                        photo: selectedParticipant.photo
+                    },
+                    prize: availablePrizes[currentPrizeIndex]
+                };
+            } else {
+                // Modo padrão: participante já tem employee e prize
+                winner = selectedParticipant;
+            }
             
             console.log('🏆 Vencedor:', winner);
             
@@ -1699,14 +2157,15 @@ function showResult(winner) {
     name.textContent = winner.employee.name;
     prize.textContent = `🎁 ${winner.prize}`;
     
-    // Adicionar ao histórico
+    // Adicionar ao histórico com campo employee para compatibilidade
     prizeHistory.push({
         name: winner.employee.name,
         photo: winner.employee.photo,
-        prize: winner.prize
+        prize: winner.prize,
+        employee: winner.employee.name // Campo adicional para compatibilidade
     });
     
-    // 🎯 Remover o prêmio da lista automaticamente
+    // Remover o prêmio da lista automaticamente
     const prizeIndex = prizes.indexOf(winner.prize);
     if (prizeIndex !== -1) {
         prizes.splice(prizeIndex, 1);
@@ -1717,16 +2176,42 @@ function showResult(winner) {
         updateParticipants();
     }
     
+    // Lógica específica para cada modo
+    if (drawMode === 'premio-funcionario') {
+        // Remover o prêmio sorteado da lista de prêmios disponíveis
+        const availablePrizeIndex = availablePrizes.indexOf(winner.prize);
+        if (availablePrizeIndex !== -1) {
+            availablePrizes.splice(availablePrizeIndex, 1);
+            console.log(`🏆 Prêmio "${winner.prize}" concluído no modo Prêmio → Funcionário`);
+        }
+        
+        // Ajustar índice se necessário
+        if (currentPrizeIndex >= availablePrizes.length) {
+            currentPrizeIndex = 0;
+        }
+    }
+    
     updatePrizeHistoryDisplay();
     result.classList.add('show');
     createConfetti();
     
-    // 🎲 Selecionar automaticamente o próximo colaborador após 3 segundos
+    // Lógica de próximo sorteio baseada no modo
     if (prizes.length > 0) {
         setTimeout(() => {
-            const nextEmployee = selectNextEmployee();
-            if (nextEmployee && debugMode) {
-                console.log(`🎲 Próximo colaborador selecionado: ${nextEmployee}`);
+            if (drawMode === 'funcionario-premio') {
+                // Modo padrão: selecionar próximo funcionário
+                const nextEmployee = selectNextEmployee();
+                if (nextEmployee && debugMode) {
+                    console.log(`🎲 Próximo colaborador selecionado: ${nextEmployee}`);
+                }
+            } else if (drawMode === 'premio-funcionario') {
+                // Modo Prêmio → Funcionário: avançar para próximo prêmio automaticamente
+                if (availablePrizes.length > 0) {
+                    nextPrize();
+                    console.log(`🏆 Avançando automaticamente para próximo prêmio: ${availablePrizes[currentPrizeIndex]}`);
+                } else {
+                    console.log(`🏁 Todos os prêmios foram sorteados no modo Prêmio → Funcionário!`);
+                }
             }
         }, 3000);
     }
@@ -2546,7 +3031,7 @@ function switchTeam() {
         drawWheel();
     }
     if (fullscreenCtx) {
-        drawWheel(true);
+        drawFullscreenWheel();
     }
     
     console.log(`🔄 Time alterado para: ${currentTeam}`);

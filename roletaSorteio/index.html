@@ -55,7 +55,7 @@
 
             <div class="tab-content active" id="employees-tab">
                 <div style="margin-bottom: 15px; text-align: center;">
-                    <div style="margin-bottom: 10px;">
+                    <div id="employeeOrderSection" style="margin-bottom: 10px;">
                         <label style="color: #e2e8f0; font-size: 14px; margin-right: 10px;">Ordem dos Colaboradores:</label>
                         <select id="employeeOrderSelect" onchange="changeEmployeeOrder(this.value)" style="background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; border-radius: 4px; padding: 4px 8px; margin-right: 10px;">
                             <option value="random">🎲 Aleatório</option>
@@ -63,13 +63,24 @@
                             <option value="reverse">📝 Alfabética Z-A</option>
                         </select>
                     </div>
-                    <button class="btn btn-add" onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); border: none; margin-right: 10px;">
+                    <button class="btn btn-add" id="nextEmployeeBtn" onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); border: none; margin-right: 10px;">
                         ⏭️ Próximo Colaborador
                     </button>
-                    <button class="btn btn-add" onclick="openFullscreenManual()" style="background: linear-gradient(45deg, #4299e1, #3182ce); border: none;">
+                    <button class="btn btn-add" id="fullscreenBtn" onclick="openFullscreenManual()" style="background: linear-gradient(45deg, #4299e1, #3182ce); border: none;">
                         🔍 Tela Cheia
                     </button>
+                    <!-- Botão específico para modo Prêmio → Funcionário -->
+                    <button class="btn btn-add" id="startDrawBtn" onclick="startPrizeToEmployeeDraw()" style="display: none; background: linear-gradient(45deg, #48bb78, #38a169); border: none; margin-right: 10px;">
+                        🎯 Iniciar Sorteio
+                    </button>
                 </div>
+                <!-- Mensagem informativa para modo Prêmio → Funcionário -->
+                <div id="prizeToEmployeeInfo" style="display: none; text-align: center; margin-bottom: 15px; padding: 10px; background: rgba(72, 187, 120, 0.1); border: 1px solid #48bb78; border-radius: 8px; color: #48bb78; font-size: 14px;">
+                    ✅ <strong>Modo Prêmio → Funcionário ativo!</strong><br>
+                    Funcionários elegíveis selecionados automaticamente.<br>
+                    <span style="font-size: 12px; opacity: 0.8;">💡 Clique em um funcionário para desmarcar/remarcar (se não ganhou ainda)</span>
+                </div>
+                
                 <div class="employee-grid" id="employeeGrid"></div>
             </div>
 
@@ -89,6 +100,12 @@
 
         <div class="main-content">
             <div class="wheel-section">
+                <!-- Indicador do prêmio atual (só aparece no modo Prêmio → Funcionário) -->
+                <div id="currentPrizeIndicator" style="display: none; text-align: center; margin-bottom: 15px; padding: 10px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 8px; color: white; font-weight: bold;">
+                    <div style="font-size: 14px; margin-bottom: 5px;">🏆 Prêmio em Disputa:</div>
+                    <div id="currentPrizeText" style="font-size: 16px;">-</div>
+                </div>
+                
                 <div class="wheel-wrapper">
                     <div class="wheel-pointer"></div>
                     <canvas id="wheelCanvas" width="350" height="350"></canvas>
@@ -142,10 +159,16 @@
         <div class="fullscreen-content">
             <div class="fullscreen-title" id="fullscreenTitle">🎯 ROLETA BMZ 🎯</div>
             
+            <!-- Indicador do prêmio atual na tela cheia -->
+            <div id="fullscreenCurrentPrize" style="display: none; text-align: center; margin-bottom: 15px; padding: 15px; background: rgba(102, 126, 234, 0.2); border: 2px solid #667eea; border-radius: 12px; color: #667eea; font-weight: bold;">
+                <div style="font-size: 18px; margin-bottom: 5px;">🏆 Prêmio em Disputa:</div>
+                <div id="fullscreenCurrentPrizeText" style="font-size: 22px; color: white;">-</div>
+            </div>
+            
             <div id="nextEmployeeDisplay" style="text-align: center; margin-bottom: 15px; display: none;"></div>
             
-            <div style="text-align: center; margin-bottom: 20px;">
-                <button onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-right: 15px; font-size: 14px;">
+            <div id="fullscreenControls" style="text-align: center; margin-bottom: 20px;">
+                <button id="fullscreenNextBtn" onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-right: 15px; font-size: 14px;">
                     ⏭️ Próximo
                 </button>
                 <button onclick="spinWheel()" id="fullscreenSpinBtn" style="background: linear-gradient(45deg, #48bb78, #38a169); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">

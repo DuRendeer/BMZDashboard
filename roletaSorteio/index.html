@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMZ - Roleta de Sorteio</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .export-section {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .flexgrid {
+            width: 100%;
+        }
+        
+        /* Estilo especial para botão de configuração */
+        #discordBtn:not([title*="configurado"]) {
+            background: linear-gradient(45deg, #7289da, #5865f2);
+            animation: configPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes configPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(114, 137, 218, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(114, 137, 218, 0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-area">
+                <img src="assets/logo.png" class="logo-placeholder"></img>
+                <div>
+                    <div class="company-title">BMZ</div>
+                    <div class="subtitle">🎯 Roleta de Sorteio do operacional</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="section-title">🎪 Configure seu Sorteio</div>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('employees')">👥 Colaboradores</button>
+                <button class="tab" onclick="switchTab('prizes')">🎁 Prêmios</button>
+            </div>
+
+            <div class="tab-content active" id="employees-tab">
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <div style="margin-bottom: 10px;">
+                        <label style="color: #e2e8f0; font-size: 14px; margin-right: 10px;">Ordem dos Colaboradores:</label>
+                        <select id="employeeOrderSelect" onchange="changeEmployeeOrder(this.value)" style="background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; border-radius: 4px; padding: 4px 8px; margin-right: 10px;">
+                            <option value="random">🎲 Aleatório</option>
+                            <option value="alphabetic">📝 Alfabética A-Z</option>
+                            <option value="reverse">📝 Alfabética Z-A</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-add" onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); border: none; margin-right: 10px;">
+                        ⏭️ Próximo Colaborador
+                    </button>
+                    <button class="btn btn-add" onclick="openFullscreenManual()" style="background: linear-gradient(45deg, #4299e1, #3182ce); border: none;">
+                        🔍 Tela Cheia
+                    </button>
+                </div>
+                <div class="employee-grid" id="employeeGrid"></div>
+            </div>
+
+            <div class="tab-content" id="prizes-tab">
+                <div class="input-group">
+                    <input type="text" id="prizeInput" placeholder="Digite um prêmio (ex: Vale-alimentação R$200)" maxlength="40">
+                    <button class="btn btn-add" onclick="addPrize()">➕ Adicionar</button>
+                    <button class="btn btn-add" onclick="importJSON()">📁 Importar JSON</button>
+                    <button class="btn btn-clear" onclick="clearPrizes()">🗑️ Limpar</button>
+                </div>
+                <input type="file" id="jsonFileInput" accept=".json" style="display: none;" onchange="handleFileImport(event)">
+                <div class="prizes-list" id="prizesList">
+                    <div class="empty-state">Nenhum prêmio adicionado</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="wheel-section">
+                <div class="wheel-wrapper">
+                    <div class="wheel-pointer"></div>
+                    <canvas id="wheelCanvas" width="350" height="350"></canvas>
+                </div>
+                <button class="btn btn-spin" id="spinBtn" onclick="spinWheel()" disabled>
+                    🎯 GIRAR ROLETA
+                </button>
+            </div>
+
+            <div class="participants-section">
+                <div class="section-header">
+                    🏆 Histórico de Prêmios
+                </div>
+                <div id="prizeHistoryList">
+                    <div class="empty-state">Nenhum prêmio foi sorteado ainda.</div>
+                </div>
+                
+                <!-- 🔧 SEÇÃO DE EXPORTAÇÃO ATUALIZADA -->
+                <div class="export-section">
+                    <button class="btn btn-add flexgrid" id="discordBtn" onclick="exportarParaDiscord()">
+                        🔧 Configurar Discord
+                    </button>
+                    <button class="btn btn-clear flexgrid" onclick="downloadReport()" style="margin-top: 10px;">
+                        📄 Baixar Relatório TXT
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="result" id="result">
+            <h2>🏆 Temos um Vencedor! 🏆</h2>
+            <img id="winnerPhoto" class="winner-photo" alt="Foto do vencedor">
+            <div class="winner-info" id="winnerName"></div>
+            <div class="winner-prize" id="winnerPrize"></div>
+        </div>
+    </div>
+
+    <!-- 🎬 TELA CHEIA DA ROLETA -->
+    <div class="fullscreen-overlay" id="fullscreenOverlay">
+        <div class="sound-controls">
+            <button class="sound-btn" id="soundToggle" onclick="toggleSound()" title="Som On/Off">🔊</button>
+            <div class="volume-control">
+                <input type="range" id="volumeSlider" min="0" max="100" value="70" 
+                       oninput="adjustVolume(this.value)" title="Volume">
+                <span id="volumeDisplay">70%</span>
+            </div>
+        </div>
+        
+        <button class="close-fullscreen" onclick="closeFullscreen()" title="Fechar tela cheia">×</button>
+        
+        <div class="fullscreen-content">
+            <div class="fullscreen-title" id="fullscreenTitle">🎯 ROLETA BMZ 🎯</div>
+            
+            <div id="nextEmployeeDisplay" style="text-align: center; margin-bottom: 15px; display: none;"></div>
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button onclick="selectNextEmployee()" style="background: linear-gradient(45deg, #9f7aea, #805ad5); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-right: 15px; font-size: 14px;">
+                    ⏭️ Próximo
+                </button>
+                <button onclick="spinWheel()" id="fullscreenSpinBtn" style="background: linear-gradient(45deg, #48bb78, #38a169); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                    🎯 Girar
+                </button>
+            </div>
+            
+            <div class="fullscreen-wheel-wrapper">
+                <div class="fullscreen-pointer"></div>
+                <canvas id="fullscreenCanvas" width="500" height="500"></canvas>
+            </div>
+
+            <div class="fullscreen-result" id="fullscreenResult">
+                <button onclick="hideResult()" style="position: absolute; top: 15px; right: 15px; background: #e53e3e; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; font-weight: bold; z-index: 1000;">×</button>
+                <h2>🏆 VENCEDOR! 🏆</h2>
+                <img id="fullscreenWinnerPhoto" class="fullscreen-winner-photo" alt="Foto do vencedor">
+                <div class="fullscreen-winner-name" id="fullscreenWinnerName"></div>
+                <div class="fullscreen-winner-prize" id="fullscreenWinnerPrize"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

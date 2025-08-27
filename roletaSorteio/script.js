@@ -1,5 +1,5 @@
-// 🏢 Base de dados dos colaboradores BMZ
-const employees = [
+// 🏢 Base de dados dos colaboradores BMZ - Operacional
+const operationalEmployees = [
     { name: "Adriano Kolitski", photo: "assets/colaboradores/ADRIANO KOLITSKI.jpg" },
     { name: "Eduardo Sochodolak", photo: "assets/colaboradores/EDUARDO SOCHODOLAK.jpg" },
     { name: "Leonardo Marconato", photo: "assets/colaboradores/Leonardo M.png" },
@@ -26,6 +26,29 @@ const employees = [
     { name: "Maria Leticia", photo: "assets/colaboradores/MARIA LETICIA.png" },
     { name: "Lucas Racelli", photo: "assets/colaboradores/LUCAS RACELLI.jpg" }
 ];
+
+// 🏪 Base de dados dos colaboradores BMZ - Comercial (Primeiro Atendimento)
+const commercialEmployees = [
+    { name: "Amanda", photo: "assets/colaboradores/PrimeiroAtendimento/Amanda.png" },
+    { name: "Ana Paula", photo: "assets/colaboradores/PrimeiroAtendimento/Ana Paula.png" },
+    { name: "Elaine", photo: "assets/colaboradores/PrimeiroAtendimento/Elaine.png" },
+    { name: "Erica", photo: "assets/colaboradores/PrimeiroAtendimento/Erica.png" },
+    { name: "Evair", photo: "assets/colaboradores/PrimeiroAtendimento/Evair.png" },
+    { name: "Gabriele", photo: "assets/colaboradores/PrimeiroAtendimento/Gabriele.png" },
+    { name: "Geane", photo: "assets/colaboradores/PrimeiroAtendimento/Geane.png" },
+    { name: "Gessica", photo: "assets/colaboradores/PrimeiroAtendimento/Gessica.png" },
+    { name: "Hillary", photo: "assets/colaboradores/PrimeiroAtendimento/Hillary.png" },
+    { name: "Janayna", photo: "assets/colaboradores/PrimeiroAtendimento/Janayna.png" },
+    { name: "José Araujo", photo: "assets/colaboradores/PrimeiroAtendimento/José Araujo.png" },
+    { name: "João Araujo", photo: "assets/colaboradores/PrimeiroAtendimento/João Araujo.png" },
+    { name: "Lucas", photo: "assets/colaboradores/PrimeiroAtendimento/Lucas.png" },
+    { name: "Maria Rita", photo: "assets/colaboradores/PrimeiroAtendimento/Maria Rita.png" },
+    { name: "Milene", photo: "assets/colaboradores/PrimeiroAtendimento/Milene.png" }
+];
+
+// Variáveis de controle de equipe
+let currentTeam = 'operacional';
+let employees = [...operationalEmployees];
 
 let selectedEmployees = [];
 let prizes = [];
@@ -2496,6 +2519,38 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// 🔄 Função para alternar entre equipes
+function switchTeam() {
+    if (currentTeam === 'operacional') {
+        currentTeam = 'comercial';
+        employees = [...commercialEmployees];
+        document.getElementById('currentTeam').textContent = 'comercial';
+    } else {
+        currentTeam = 'operacional';
+        employees = [...operationalEmployees];
+        document.getElementById('currentTeam').textContent = 'operacional';
+    }
+    
+    // Limpar seleções atuais
+    selectedEmployees = [];
+    participants = [];
+    
+    // Redesenhar o grid de colaboradores
+    loadEmployees();
+    updateParticipants();
+    updateDisplay();
+    
+    // Resetar roleta
+    if (ctx) {
+        drawWheel();
+    }
+    if (fullscreenCtx) {
+        drawWheel(true);
+    }
+    
+    console.log(`🔄 Time alterado para: ${currentTeam}`);
+}
 
 // Inicializar
 

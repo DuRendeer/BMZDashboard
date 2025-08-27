@@ -89,6 +89,6 @@ Este projeto está sob a licença "Faz o que você quiser, mas não me culpe se 
 
 ---
 
-*Feito com atraso, muito ☕ e deadline impossível por [Codduo](https://github.com/Codduo)*
+*Feito com atraso, muito ☕ e deadline impossível por  [DuRendeer](https://github.com/DuRendeer) [whoisleoo](https://github.com/whoisleoo)*
 
 > "Nem todo herói usa capa. Alguns usam PHP e choram internamente." - Desenvolvedor Anônimo, 2025

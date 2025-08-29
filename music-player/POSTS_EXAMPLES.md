@@ -1,6 +1,6 @@
-# Lista de POST para cada Closer
+# Lista de POST para cada Closer (por ID)
 
-## URL: `sua-hostinger-url/api/webhook.php`
+## URL: `sua-hostinger-url/api/closer.php`
 ## Método: POST
 ## Content-Type: application/json
 
@@ -8,157 +8,134 @@
 
 ## ✅ Closers COM músicas (funcionam):
 
-### José Araujo
+### José Araujo (ID: 10092211)
 ```json
 {
-    "closer": "José Araujo",
-    "message": "Tocando música do José!"
+    "closer": "10092211",
+    "message": "Uma vitória!"
 }
 ```
 
-### Janayna Freisleben
+### Janayna Freisleben (ID: 12009848)
 ```json
 {
-    "closer": "Janayna Freisleben", 
-    "message": "Tocando música da Janayna!"
+    "closer": "12009848", 
+    "message": "Uma vitória!"
 }
 ```
 
-### Maria Rita
+### Maria Rita (ID: 12778000)
 ```json
 {
-    "closer": "Maria Rita",
-    "message": "Tocando música da Maria Rita!"
+    "closer": "12778000",
+    "message": "Uma vitória!"
+}
+```
+
+### Lucas Silva (ID: 11288124)
+```json
+{
+    "closer": "11288124",
+    "message": "Uma vitória!"
+}
+```
+
+### João Guilherme (ID: 12197692)
+```json
+{
+    "closer": "12197692",
+    "message": "Uma vitória!"
+}
+```
+
+### Amanda Kloster (ID: 12703588)
+```json
+{
+    "closer": "12703588",
+    "message": "Uma vitória!"
 }
 ```
 
 ---
 
-## 📂 Closers SEM músicas (precisam dos arquivos .mp3):
+## 📂 Outros Closers com pastas (alguns têm MPs3, outros precisam):
 
-### Gessica Trzesniovski
+### Millene Leal (ID: 11668440)
 ```json
 {
-    "closer": "Gessica Trzesniovski",
-    "message": "Tocando música da Gessica!"
+    "closer": "11668440",
+    "message": "Uma vitória!"
 }
 ```
 
-### Hevilin Machado
+### Erica Okarenski (ID: 11863844)
 ```json
 {
-    "closer": "Hevilin Machado",
-    "message": "Tocando música da Hevilin!"
+    "closer": "11863844",
+    "message": "Uma vitória!"
 }
 ```
 
-### Hilary Erddmann
+### Gessica Trzesniovski (ID: 12777984)
 ```json
 {
-    "closer": "Hilary Erddmann",
-    "message": "Tocando música da Hilary!"
-}   
-```
-
-### Ana Paula Melnik
-```json
-{
-    "closer": "Ana Paula Melnik",
-    "message": "Tocando música da Ana Paula!"
+    "closer": "12777984",
+    "message": "Uma vitória!"
 }
 ```
 
-### Gabriela Korchak
+### Elaine Borges (ID: 10100679)
 ```json
 {
-    "closer": "Gabriela Korchak",
-    "message": "Tocando música da Gabriela!"
+    "closer": "10100679",
+    "message": "Uma vitória!"
 }
 ```
 
-### Henrique Gerei
+### Evair Gonçalves de Oliveira (ID: 11326548)
 ```json
 {
-    "closer": "Henrique Gerei",
-    "message": "Tocando música do Henrique!"
+    "closer": "11326548",
+    "message": "Uma vitória!"
 }
 ```
 
-### Bianca Staxiv
+### Gabriela Korchak (ID: 13451184)
 ```json
 {
-    "closer": "Bianca Staxiv",
-    "message": "Tocando música da Bianca!"
+    "closer": "13451184",
+    "message": "Uma vitória!"
 }
 ```
 
-### Lucas Silva
+### Geane (ID: 13562492)
 ```json
 {
-    "closer": "Lucas Silva",
-    "message": "Tocando música do Lucas!"
+    "closer": "13562492",
+    "message": "Uma vitória!"
 }
 ```
 
-### Evair Gonçalves de Oliveira
+### Hilary Erddmann (ID: 12926344)
 ```json
 {
-    "closer": "Evair Gonçalves de Oliveira",
-    "message": "Tocando música do Evair!"
+    "closer": "12926344",
+    "message": "Uma vitória!"
 }
 ```
 
-### Millene Leal
+### Ana Paula Melnik (ID: 13055112)
 ```json
 {
-    "closer": "Millene Leal",
-    "message": "Tocando música da Millene!"
-}
-```
-
-### Erica Okarenski
-```json
-{
-    "closer": "Erica Okarenski",
-    "message": "Tocando música da Erica!"
-}
-```
-
-### João Guilherme
-```json
-{
-    "closer": "João Guilherme",
-    "message": "Tocando música do João!"
-}
-```
-
-### Amanda Kloster
-```json
-{
-    "closer": "Amanda Kloster",
-    "message": "Tocando música da Amanda!"
-}
-```
-
-### Elaine Borges
-```json
-{
-    "closer": "Elaine Borges",
-    "message": "Tocando música da Elaine!"
-}
-```
-
-### Geane
-```json
-{
-    "closer": "Geane",
-    "message": "Tocando música da Geane!"
+    "closer": "13055112",
+    "message": "Uma vitória!"
 }
 ```
 
 ---
 
 ## ⚠️ Importante:
-- Apenas **José Araujo**, **Janayna Freisleben** e **Maria Rita** têm arquivos de música (1.mp3, 2.mp3, 3.mp3)
-- Os outros closers precisam ter os arquivos adicionados nas suas pastas
-- O sistema escolhe aleatoriamente entre os arquivos disponíveis
+- Agora o sistema usa **IDs** ao invés de nomes
+- O mapeamento ID → Nome está em `config/closers_mapping.json`
+- Apenas closers com pastas de música funcionam
+- O sistema escolhe aleatoriamente entre os MP3s disponíveis na pasta

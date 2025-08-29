@@ -13,12 +13,25 @@ $response = ['success' => false, 'data' => null];
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
-        $closerName = isset($input['closer_name']) ? trim($input['closer_name']) : '';
+        $closerId = isset($input['closer']) ? trim($input['closer']) : '';
         $message = isset($input['message']) ? $input['message'] : '';
         
-        if (empty($closerName)) {
-            throw new Exception('Nome do Closer é obrigatório');
+        if (empty($closerId)) {
+            throw new Exception('ID do Closer é obrigatório');
         }
+        
+        // Carregar mapeamento de IDs para nomes
+        $mappingFile = '../config/closers_mapping.json';
+        if (!file_exists($mappingFile)) {
+            throw new Exception('Arquivo de mapeamento não encontrado');
+        }
+        
+        $mapping = json_decode(file_get_contents($mappingFile), true);
+        if (!isset($mapping[$closerId])) {
+            throw new Exception('ID do Closer não encontrado: ' . $closerId);
+        }
+        
+        $closerName = $mapping[$closerId];
         
         // Verificar se pasta do closer existe
         $closerDir = '../musica/' . $closerName;
@@ -45,14 +58,32 @@ try {
         
         // Salvar comando
         $commandData = [
+            'closer_id' => $closerId,
             'closer_name' => $closerName,
-            'music_name' => pathinfo($randomMusic, PATHINFO_FILENAME),
+            'music_name' => "$closerName - " . pathinfo($randomMusic, PATHINFO_FILENAME),
             'music_url' => $musicPath,
-            'message' => $message ?: "Tocando para $closerName",
+            'message' => "Tocando música do $closerName",
             'timestamp' => time()
         ];
         
         file_put_contents('../data/current_command.json', json_encode($commandData));
+        
+        // Salvar no log também
+        $logEntry = array_merge($commandData, [
+            'closer' => $closerName, // Para compatibilidade com o frontend
+            'date' => date('d/m/Y H:i:s', $commandData['timestamp'])
+        ]);
+        
+        $logsFile = '../data/logs.json';
+        $logs = [];
+        if (file_exists($logsFile)) {
+            $logs = json_decode(file_get_contents($logsFile), true) ?: [];
+        }
+        
+        array_unshift($logs, $logEntry); // Adicionar no início
+        $logs = array_slice($logs, 0, 100); // Manter apenas os últimos 100
+        
+        file_put_contents($logsFile, json_encode($logs));
         
         $response['success'] = true;
         $response['data'] = $commandData;

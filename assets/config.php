@@ -1,4 +1,5 @@
 <?php
+// Configurações do sistema - NÃO COMMITAR ESTE ARQUIVO
 function getCredentials() {
     // Hash das credenciais para segurança
     $credentials = [

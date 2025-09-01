@@ -1,0 +1,33 @@
+# Configurações para o Separador de Holerites
+
+# Permitir CORS para APIs
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "POST, GET, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# Configurações de upload
+php_value upload_max_filesize 50M
+php_value post_max_size 50M
+php_value max_execution_time 300
+
+# Permitir acesso às pastas de arquivos
+<Directory "Holerites">
+    Options +Indexes
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Directory "Inputs">
+    Options +Indexes
+    AllowOverride None
+    Require all granted
+</Directory>
+
+# Página principal como PHP
+DirectoryIndex index.php index.html
+
+# Configurações de erro
+ErrorDocument 404 /404.html
+ErrorDocument 500 /500.html

@@ -48,6 +48,7 @@ Bem-vindos ao **DashboardBMZ**, um sistema que nasceu de muito suor, lágrimas e
 1. `Initial commit` - esperança e otimismo
 2. `O sistema como ta` - aceitação e resignação
 
+
 ## Como Rodar Esta Obra Prima
 
 1. Clone o repo (se tiver coragem)
